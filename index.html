@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Filmify Studio Pro</title>
+    <!-- Stable CDNs -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -19,26 +20,37 @@
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <div style="height:100vh; display:flex; align-items:center; justify-content:center; color:#444; font-family:monospace; font-size:10px; letter-spacing:4px;">
+            INITIALIZING...
+        </div>
+    </div>
+
     <script type="text/babel">
+        // Safety Check: Wait for libraries to be ready
         const { useState, useEffect } = React;
-        const { motion, AnimatePresence } = window.FramerMotion;
-
-        // --- APNA APPS SCRIPT URL YAHAN DALEIN ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbwOcyf7zV-gU1UoaJSu4P_1hXTywXkRsNNBveN6oiCUwjlpnUd79vZpz1lE3IJaDzjvgg/exec";
-
-        const Icon = ({ name, size = 18 }) => {
-            useEffect(() => { lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} style={{ width: size, height: size }}></i>;
-        };
-
+        
         function App() {
             const [clients, setClients] = useState([]);
             const [loading, setLoading] = useState(true);
             const [isAddOpen, setIsAddOpen] = useState(false);
 
+            // Access FramerMotion safely
+            const { motion, AnimatePresence } = window.FramerMotion || { motion: (props) => <div {...props} />, AnimatePresence: (props) => <>{props.children}</> };
+
+            // --- APNA APPS SCRIPT URL YAHAN DALEIN ---
+            const API_URL = "https://script.google.com/macros/s/AKfycbwOcyf7zV-gU1UoaJSu4P_1hXTywXkRsNNBveN6oiCUwjlpnUd79vZpz1lE3IJaDzjvgg/exec";
+
+            const Icon = ({ name, size = 18 }) => {
+                useEffect(() => { if(window.lucide) lucide.createIcons(); }, [name]);
+                return <i data-lucide={name} style={{ width: size, height: size }}></i>;
+            };
+
             useEffect(() => {
-                fetch(API_URL).then(res => res.json()).then(data => { setClients(data); setLoading(false); });
+                fetch(API_URL)
+                    .then(res => res.json())
+                    .then(data => { setClients(data); setLoading(false); })
+                    .catch(err => { console.error(err); setLoading(false); });
             }, []);
 
             const sync = async (action, client) => {
@@ -46,19 +58,27 @@
                                 action === 'delete' ? clients.filter(c => c.ID !== client.ID) :
                                 clients.map(c => c.ID === client.ID ? client : c);
                 setClients(updated);
-                await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, id: client.ID, name: client.Name, date: client.Date, type: client.Type, storage: client.Storage, secure: client.Secure, links: client.Links }) });
+                
+                try {
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ action, ...client })
+                    });
+                } catch(e) { console.error("Sync failed", e); }
             };
 
-            if (loading) return <div className="h-screen flex items-center justify-center text-[10px] tracking-[0.5em] text-zinc-500 animate-pulse">FILMIFY LOADING...</div>;
+            if (loading) return <div className="h-screen flex items-center justify-center text-[10px] tracking-[0.5em] text-zinc-500 animate-pulse">CONNECTING...</div>;
 
             return (
                 <div className="min-h-screen p-6 max-w-2xl mx-auto">
                     <header className="flex justify-between items-center mb-12 mt-4">
                         <h1 className="text-2xl font-light tracking-tighter">FILMIFY</h1>
-                        <button onClick={() => setIsAddOpen(true)} className="bg-white text-black px-6 py-2 rounded-full text-[10px] font-bold tracking-widest">+ NEW</button>
+                        <button onClick={() => setIsAddOpen(true)} className="bg-white text-black px-6 py-2 rounded-full text-[10px] font-bold tracking-widest active:scale-90 transition-all">+ NEW</button>
                     </header>
 
                     <div className="space-y-6">
+                        {clients.length === 0 && <p className="text-center text-zinc-700 text-xs py-20">No projects found. Create your first one!</p>}
                         {clients.map(c => (
                             <motion.div layout key={c.ID} className={`glass p-8 transition-all duration-700 ${c.Secure ? 'secure-glow' : ''}`}>
                                 <div className="flex justify-between items-start mb-6">
@@ -66,7 +86,7 @@
                                         <p className="text-[9px] text-zinc-500 uppercase font-mono mb-1">{c.Date} • {c.Type}</p>
                                         <h2 className="text-xl font-light">{c.Name}</h2>
                                     </div>
-                                    <button onClick={() => sync('delete', c)} className="text-zinc-800 hover:text-red-500"><Icon name="trash-2" size={16}/></button>
+                                    <button onClick={() => { if(confirm("Delete project?")) sync('delete', c) }} className="text-zinc-800 hover:text-red-500"><Icon name="trash-2" size={16}/></button>
                                 </div>
                                 <div className="flex gap-3">
                                     <div className="flex-1 bg-white/5 p-3 rounded-xl border border-white/5">
@@ -86,31 +106,37 @@
                         ))}
                     </div>
 
-                    {isAddOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl">
-                            <div className="w-full max-w-sm glass p-10">
-                                <h3 className="text-2xl font-light mb-8">New Project</h3>
-                                <input id="n" placeholder="Client Name" className="text-lg mb-6 border-b border-white/10 pb-2" />
-                                <input id="d" type="date" className="text-lg mb-10 border-b border-white/10 pb-2" />
-                                <div className="flex gap-4">
-                                    <button onClick={() => setIsAddOpen(false)} className="flex-1 py-4 text-zinc-500 text-xs">CANCEL</button>
-                                    <button onClick={() => {
-                                        const n = document.getElementById('n').value;
-                                        const d = document.getElementById('d').value;
-                                        if(n && d) {
-                                            sync('add', { ID: Date.now().toString(), Name: n, Date: d, Type: 'Wedding', Storage: 'HDD 01', Secure: false, Links: {} });
-                                            setIsAddOpen(false);
-                                        }
-                                    }} className="flex-1 py-4 bg-white text-black rounded-full text-[10px] font-bold tracking-widest">CREATE</button>
+                    <AnimatePresence>
+                        {isAddOpen && (
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl">
+                                <div className="w-full max-w-sm glass p-10">
+                                    <h3 className="text-2xl font-light mb-8">New Project</h3>
+                                    <input id="n" placeholder="Client Name" className="text-lg mb-6 border-b border-white/10 pb-2" />
+                                    <input id="d" type="date" className="text-lg mb-10 border-b border-white/10 pb-2" />
+                                    <div className="flex gap-4">
+                                        <button onClick={() => setIsAddOpen(false)} className="flex-1 py-4 text-zinc-500 text-xs">CANCEL</button>
+                                        <button onClick={() => {
+                                            const n = document.getElementById('n').value;
+                                            const d = document.getElementById('d').value;
+                                            if(n && d) {
+                                                sync('add', { ID: Date.now().toString(), Name: n, Date: d, Type: 'Wedding', Storage: 'HDD 01', Secure: false, Links: "{}" });
+                                                setIsAddOpen(false);
+                                            }
+                                        }} className="flex-1 py-4 bg-white text-black rounded-full text-[10px] font-bold tracking-widest">CREATE</button>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             );
         }
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+
+        // Final check before rendering
+        window.onload = () => {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        };
     </script>
 </body>
 </html>
