@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-black text-white antialiased;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass {
+  @apply bg-zinc-900/70 backdrop-blur-2xl border border-white/10;
+}
+
+.secure-glow {
+  box-shadow: 0 0 50px -10px rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.5);
+}
