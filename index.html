@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Filmify Studio Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+        body { background: #000; color: #fff; font-family: 'Inter', sans-serif; margin: 0; -webkit-tap-highlight-color: transparent; }
+        .glass { background: rgba(15, 15, 15, 0.7); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.08); border-radius: 2rem; }
+        .secure-glow { box-shadow: 0 0 50px -10px rgba(16, 185, 129, 0.3); border-color: rgba(16, 185, 129, 0.5); }
+        input, select { background: transparent; border: none; outline: none; color: inherit; width: 100%; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { motion, AnimatePresence } = window.FramerMotion;
+
+        // --- APNA APPS SCRIPT URL YAHAN DALEIN ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbwOcyf7zV-gU1UoaJSu4P_1hXTywXkRsNNBveN6oiCUwjlpnUd79vZpz1lE3IJaDzjvgg/exec";
+
+        const Icon = ({ name, size = 18 }) => {
+            useEffect(() => { lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }}></i>;
+        };
+
+        function App() {
+            const [clients, setClients] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [isAddOpen, setIsAddOpen] = useState(false);
+
+            useEffect(() => {
+                fetch(API_URL).then(res => res.json()).then(data => { setClients(data); setLoading(false); });
+            }, []);
+
+            const sync = async (action, client) => {
+                const updated = action === 'add' ? [...clients, client] :
+                                action === 'delete' ? clients.filter(c => c.ID !== client.ID) :
+                                clients.map(c => c.ID === client.ID ? client : c);
+                setClients(updated);
+                await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, id: client.ID, name: client.Name, date: client.Date, type: client.Type, storage: client.Storage, secure: client.Secure, links: client.Links }) });
+            };
+
+            if (loading) return <div className="h-screen flex items-center justify-center text-[10px] tracking-[0.5em] text-zinc-500 animate-pulse">FILMIFY LOADING...</div>;
+
+            return (
+                <div className="min-h-screen p-6 max-w-2xl mx-auto">
+                    <header className="flex justify-between items-center mb-12 mt-4">
+                        <h1 className="text-2xl font-light tracking-tighter">FILMIFY</h1>
+                        <button onClick={() => setIsAddOpen(true)} className="bg-white text-black px-6 py-2 rounded-full text-[10px] font-bold tracking-widest">+ NEW</button>
+                    </header>
+
+                    <div className="space-y-6">
+                        {clients.map(c => (
+                            <motion.div layout key={c.ID} className={`glass p-8 transition-all duration-700 ${c.Secure ? 'secure-glow' : ''}`}>
+                                <div className="flex justify-between items-start mb-6">
+                                    <div>
+                                        <p className="text-[9px] text-zinc-500 uppercase font-mono mb-1">{c.Date} • {c.Type}</p>
+                                        <h2 className="text-xl font-light">{c.Name}</h2>
+                                    </div>
+                                    <button onClick={() => sync('delete', c)} className="text-zinc-800 hover:text-red-500"><Icon name="trash-2" size={16}/></button>
+                                </div>
+                                <div className="flex gap-3">
+                                    <div className="flex-1 bg-white/5 p-3 rounded-xl border border-white/5">
+                                        <p className="text-[8px] text-zinc-600 uppercase mb-1">Storage</p>
+                                        <select value={c.Storage} onChange={e => sync('update', {...c, Storage: e.target.value})} className="text-xs">
+                                            <option value="HDD 01">HDD 01</option>
+                                            <option value="SSD 01">SSD 01</option>
+                                            <option value="CLOUD">CLOUD</option>
+                                        </select>
+                                    </div>
+                                    <button onClick={() => sync('update', {...c, Secure: !c.Secure})} 
+                                        className={`flex-1 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all ${c.Secure ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-900 text-zinc-600 border-zinc-800'}`}>
+                                        {c.Secure ? 'SECURED' : 'MARK SECURE'}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    {isAddOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl">
+                            <div className="w-full max-w-sm glass p-10">
+                                <h3 className="text-2xl font-light mb-8">New Project</h3>
+                                <input id="n" placeholder="Client Name" className="text-lg mb-6 border-b border-white/10 pb-2" />
+                                <input id="d" type="date" className="text-lg mb-10 border-b border-white/10 pb-2" />
+                                <div className="flex gap-4">
+                                    <button onClick={() => setIsAddOpen(false)} className="flex-1 py-4 text-zinc-500 text-xs">CANCEL</button>
+                                    <button onClick={() => {
+                                        const n = document.getElementById('n').value;
+                                        const d = document.getElementById('d').value;
+                                        if(n && d) {
+                                            sync('add', { ID: Date.now().toString(), Name: n, Date: d, Type: 'Wedding', Storage: 'HDD 01', Secure: false, Links: {} });
+                                            setIsAddOpen(false);
+                                        }
+                                    }} className="flex-1 py-4 bg-white text-black rounded-full text-[10px] font-bold tracking-widest">CREATE</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
